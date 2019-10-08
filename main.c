@@ -16,7 +16,7 @@
 //
 #include "find_prefix.h"
 
-char starts_with(const char *string, const char *prefix) {
+char startswith(const char *string, const char *prefix) {
     while (*prefix)
         if (*prefix++ != *string++) return 0;
     return 1;
@@ -36,21 +36,35 @@ static void errexit(const char *format, ...) {
     exit(1);
 }
 
+void usageexit(const char *program) {
+    errexit(
+        "usage: %s <gzipped-mrt-file-or-url> <zidx-file> "
+        "<ip-address>/<prefix-length> [-i] [-d]\n"
+        "\t-i: ignore zidx file provided (optional)\n"
+        "\t-d: debug print (optional)\n",
+        program);
+}
+
 int main(int argc, char **argv) {
-    if (argc != 4 && argc != 5)
-        errexit(
-            "usage: %s <gzipped-mrt-file> <zidx-file> "
-            "<ip-address>/<prefix-length> [-d]\n",
-            argv[0]);
+    const char *program = argv[0];
+    if (argc < 4) usageexit(program);
 
     const char *gzipped_mrt_path = argv[1];
     const char *zidx_path = argv[2];
     char *addr_str = argv[3];
     char *prefix_len_str = strchr(addr_str, '/');
-    _Bool debug = argc == 5;
 
-    if (debug && strcmp(argv[4], "-d"))
-        errexit("Last argument should be -d for debugging");
+    _Bool debug = 0;
+    _Bool ignore_zidx = 0;
+
+    for (int i = 4; i < argc; i++) {
+        if (!strcmp(argv[i], "-d"))
+            debug = 1;
+        else if (!strcmp(argv[i], "-i"))
+            ignore_zidx = 1;
+        else
+            usageexit(program);
+    }
 
     if (prefix_len_str == NULL)
         errexit("error: couldn't find '/' denoting prefix length\n");
@@ -79,9 +93,9 @@ int main(int argc, char **argv) {
     }
 
     streamlike_t *gzip_stream;
-    int is_url = starts_with(gzipped_mrt_path, "http") &&
-                 (starts_with(gzipped_mrt_path + 4, "://") ||
-                  starts_with(gzipped_mrt_path + 4, "s://"));
+    int is_url = startswith(gzipped_mrt_path, "http") &&
+                 (startswith(gzipped_mrt_path + 4, "://") ||
+                  startswith(gzipped_mrt_path + 4, "s://"));
     gzip_stream = is_url ? sl_http_create(gzipped_mrt_path)
                          : sl_fopen(gzipped_mrt_path, "rb");
 
@@ -91,27 +105,31 @@ int main(int argc, char **argv) {
     // errfail on error after this point
 
     zidx_index *index = zidx_index_create();
-    streamlike_t *index_stream = sl_fopen(zidx_path, "rb");
+    streamlike_t *index_stream = NULL;
+    struct prefix_checkpoint_t pfx_chkp = {-1, 0};
 
     if (index == NULL) errfail("error: couldn't create zidx index\n");
+
     if (zidx_index_init(index, gzip_stream) != ZX_RET_OK)
         errfail("error: couldn't initialize zidx index\n");
 
-    if (index_stream == NULL)
-        errfail("error: couldn't open index stream '%s'\n", zidx_path);
+    if (!ignore_zidx) {
+        index_stream = sl_fopen(zidx_path, "rb");
+        if (index_stream == NULL)
+            errfail("error: couldn't open index stream '%s'\n", zidx_path);
+        if (zidx_import(index, index_stream) != ZX_RET_OK)
+            errfail("error: couldn't import zidx index\n");
+        sl_fclose(index_stream);
+        index_stream = NULL;
 
-    if (zidx_import(index, index_stream) != ZX_RET_OK)
-        errfail("error: couldn't import zidx index\n");
-    sl_fclose(index_stream);
-    index_stream = NULL;
+        pfx_chkp = find_prefix_checkpoint(&pfx, index);
+        if (pfx_chkp.index < -1) errfail("error: couldn't find checkpoint");
+    }
 
-    struct prefix_checkpoint_t pfx_chkp = find_prefix_checkpoint(&pfx, index);
 
-    if (pfx_chkp.index < -1) errfail("error: couldn't find checkpoint");
 
     zidx_checkpoint *chkp = NULL;
-    if (pfx_chkp.index >= 0)
-        chkp = zidx_get_checkpoint(index, pfx_chkp.index);
+    if (pfx_chkp.index >= 0) chkp = zidx_get_checkpoint(index, pfx_chkp.index);
 
     uint8_t buffer[32768];
     const void *bufferp;
@@ -134,7 +152,6 @@ int main(int argc, char **argv) {
         off = 0;
     }
 
-
     while (len > 0 && status == SEARCHING) {
         assert(off + sizeof(struct mrt_header_t) <= len);
         while (status == SEARCHING) {
@@ -152,7 +169,7 @@ int main(int argc, char **argv) {
                 break;
             }
 
-            if (header.subtype == 1) { // skip peer_index_table
+            if (header.subtype == 1) {  // skip peer_index_table
                 off += sizeof(struct mrt_header_t) + header.length;
                 len -= sizeof(struct mrt_header_t) + header.length;
                 continue;

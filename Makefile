@@ -1,6 +1,13 @@
+CC=gcc
 LIBS=-lzidx -lz -lstreamlike -lparsebgp
 
+PROGRAM=pfxdump
+SRC=main.c find_prefix.c
+
 all:
-	gcc -g -O0 -o pfxdump ${LIBS} main.c find_prefix.c
+	${CC} -std=c99 -O3 -DNDEBUG -o ${PROGRAM} ${LIBS} ${SRC}
 debug:
-	gcc -g -O0 -fsanitize=address -fno-omit-frame-pointer -o pfxdump ${LIBS} -lasan main.c find_prefix.c
+	${CC} -std=c99 -g -O0 -fsanitize=address -fno-omit-frame-pointer -o ${PROGRAM} ${LIBS} -lasan ${SRC}
+clean:
+	rm -f ${PROGRAM}
+.PHONY: all debug

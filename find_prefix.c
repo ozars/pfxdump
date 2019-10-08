@@ -32,9 +32,6 @@ typedef struct __attribute__((packed)) tdv2_minimal_t {
     uint8_t prefix_length;
     char addr[0];
 } tdv2_minimal_t;
-/* static_assert(sizeof(mrt_header_t) == 12); */
-/* static_assert(offsetof(tdv2_minimal_t, sequence_number) == 12); */
-/* static_assert(offsetof(tdv2_minimal_t, prefix_length) == 16); */
 
 static const struct prefix_t* get_pfx_from_tdv2(const char* window) {
     assert(window != NULL);

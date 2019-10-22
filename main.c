@@ -82,9 +82,9 @@ int main(int argc, char **argv) {
     struct afi_prefix_t pfx;
     pfx.prefix.len = prefix_len_long;
     if (inet_pton(AF_INET, addr_str, pfx.prefix.addr)) {
-        if (pfx.prefix.len > 24)
+        if (pfx.prefix.len > 32)
             errexit(
-                "error: prefix length shouldn't be more than 24 for IPv4\n");
+                "error: prefix length shouldn't be more than 32 for IPv4\n");
         pfx.type = AFI_TYPE_IPV4;
     } else if (inet_pton(AF_INET6, addr_str, pfx.prefix.addr)) {
         pfx.type = AFI_TYPE_IPV6;
@@ -131,7 +131,7 @@ int main(int argc, char **argv) {
     zidx_checkpoint *chkp = NULL;
     if (pfx_chkp.index >= 0) chkp = zidx_get_checkpoint(index, pfx_chkp.index);
 
-    uint8_t buffer[32768];
+    uint8_t buffer[1 << 20];
     const void *bufferp;
     _Bool seek_needed = pfx_chkp.index >= 0;
     enum { SEARCHING, EXACT_MATCH_FOUND, NOT_FOUND } status = SEARCHING;

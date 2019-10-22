@@ -45,11 +45,23 @@ static const struct prefix_t* get_pfx_from_tdv2(const char* window) {
 static off_t align_to_first_header(const char* window, size_t len) {
     assert(window);
     const int threshold = 5;
-    for (size_t off = 0; off < len - sizeof(mrt_header_t); off++) {
-        mrt_header_t* headerp = (void*)(window + off);
+    for (size_t off = 0; off + sizeof(mrt_header_t) < len; off++) {
         uint32_t timestamp = 0;
         uint8_t found = 0;
-        mrt_header_t header = get_header(headerp);
+        off_t off_temp = off;
+        do {
+            mrt_header_t header = get_header(window + off_temp);
+            if (header.type != TABLE_DUMP_V2 ||
+                header.subtype < TABLE_DUMP_V2_SUBTYPE_BEGIN ||
+                header.subtype >= TABLE_DUMP_V2_SUBTYPE_END ||
+                header.timestamp < timestamp ||
+                header.length < sizeof(tdv2_minimal_t) - sizeof(mrt_header_t))
+                break;
+            if (++found == threshold) return off;
+            timestamp = header.timestamp;
+            off_temp += sizeof(mrt_header_t) + header.length;
+        } while (off_temp + sizeof(mrt_header_t) < len);
+        /* mrt_header_t header = get_header(headerp);
         while (header.type == TABLE_DUMP_V2 &&
                header.subtype >= TABLE_DUMP_V2_SUBTYPE_BEGIN &&
                header.subtype < TABLE_DUMP_V2_SUBTYPE_END &&
@@ -61,7 +73,7 @@ static off_t align_to_first_header(const char* window, size_t len) {
             headerp = (void*)(((char*)headerp) + sizeof(mrt_header_t) +
                               header.length);
             header = get_header(headerp);
-        }
+        } */
     }
     return -1;
 }

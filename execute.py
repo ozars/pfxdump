@@ -1,4 +1,4 @@
-#!/bin/env python3
+#!/usr/bin/env python3
 
 import argparse
 import datetime
@@ -229,7 +229,7 @@ def experiment(
                 date_range, collectors, gzip_path, zidx_path):
             for p in prefixes:
                 if without_zx:
-                    time = run_pfxdump(str(gzip_file), str(zx), p)\
+                    time = run_pfxdump(str(gzip_file), "-", p, "-i")\
                                     .stderr.rstrip().decode('ascii')
                     m = pnf.match(time)
                     if m:
@@ -237,7 +237,7 @@ def experiment(
                         time = m.group(2)
                     else:
                         status = ""
-                    f.write(",".join(["0", "0", comp_state, p, time, "0", str(gzip_file), status]) + "\n")
+                    f.write(",".join(["0", "0", "none", p, time, "0", str(gzip_file), status]) + "\n")
                     logger.debug(f"Done: {p} on {gzip_file} without span.")
                 for span in spans:
                     for comp_state in ["comp", "uncomp"]:
@@ -259,9 +259,14 @@ def experiment_plot(experiment_name, experiment_path, output_path, without_zx, s
     else:
         agg = ['span']
     df = pd.read_csv(experiment_path / (experiment_name + ".csv"))
+    df.prefix = pd.Categorical(df.prefix, ordered=True, categories=df.prefix.unique())
+
     df = df.astype({'time': 'double'})
     rng = list(range(0, len(df.prefix.unique()) + 1, len(df.prefix.unique()) // 20))
-    df = df[df.comp_state == "comp"]
+    if without_zx:
+        df = df[df.comp_state != "uncomp"]
+    else:
+        df = df[df.comp_state == "comp"]
     df = df.groupby(agg + ['prefix'])['time'].agg('mean').groupby(agg)
     logger.info(df.describe())
     df.plot(x='prefix', y='time', legend=True)
@@ -340,7 +345,7 @@ def main(args=None):
     subparser.add_argument("--output-path", default=experiment_dir)
     subparser.add_argument(
             "-s", "--spans", default=default_spans, type=_arg_split(","))
-    subparser.add_argument("--without_zx", action="store_true")
+    subparser.add_argument("--without-zx", action="store_true")
     subparser.add_argument(
             "-d", "--date-range", default=default_date_range,
             type=_arg_date_range)

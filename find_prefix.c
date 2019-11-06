@@ -152,31 +152,40 @@ struct prefix_checkpoint_t find_prefix_checkpoint(
     int chkp_cnt = zidx_checkpoint_count(index);
     if (chkp_cnt < 0) return (prefix_checkpoint_t){-2};
 
-    /* Linear search. */
+    /* invariant: i <= k < j, k is inclusive upperbound. */
+    int i = 0;
+    int j = chkp_cnt;
+    int shift = 0;
     prefix_checkpoint_t ret = {-1, 0};
-    for (int i = 0; i < chkp_cnt; i++) {
-        const char* window;
-        zidx_checkpoint* chkp = zidx_get_checkpoint(index, i);
-        if (chkp == NULL) return (prefix_checkpoint_t){-3};
-        size_t len = zidx_get_checkpoint_window(chkp, (const void**)&window);
-        assert(window);
-        off_t off = align_to_first_header(window, len);
-        if (off >= 0) {
-            const struct prefix_t* off_pfx = get_pfx_from_tdv2(window + off);
-            int cmp = prefix_cmp(off_pfx, &pfx->prefix);
 
-            if (cmp == 0) {
-                enum afi_type_t mrt_afi_type = get_tdv2_afi_type(window + off);
-                cmp = mrt_afi_type - pfx->type;  // account for afi_type;
-            }
-            if (cmp < 0) {
-                ret = (prefix_checkpoint_t){i, off};  // set candidate
-            } else if (cmp > 0) {
-                return ret;  // return last candidate
-            } else /* if (cmp == 0) */ {
-                return (prefix_checkpoint_t){i, off};  // return exact
-            }
-        }
+    while (j - i > shift * 2) {
+      int k = i + (j - i) / 2 - shift;
+      const char* window;
+      zidx_checkpoint* chkp = zidx_get_checkpoint(index, k);
+      if (chkp == NULL) return (prefix_checkpoint_t){-3};
+      size_t len = zidx_get_checkpoint_window(chkp, (const void**)&window);
+      assert(window);
+      off_t off = align_to_first_header(window, len);
+      if (off >= 0) {
+          const struct prefix_t* off_pfx = get_pfx_from_tdv2(window + off);
+          int cmp = prefix_cmp(off_pfx, &pfx->prefix);
+
+          if (cmp == 0) {
+              enum afi_type_t mrt_afi_type = get_tdv2_afi_type(window + off);
+              cmp = mrt_afi_type - pfx->type;
+          }
+          if (cmp < 0) {
+              ret = (prefix_checkpoint_t){k, off};
+              i = k + 1;
+          } else if (cmp > 0) {
+              j = k - 1;
+          } else /*if (cmp == 0)*/ {
+              return (prefix_checkpoint_t){k, off};
+          }
+          shift = 0;
+      } else {
+          shift++;
+      }
     }
     return ret;  // return last candidate
 }

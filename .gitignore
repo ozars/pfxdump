@@ -1,0 +1,4 @@
+data/
+*.sw?
+.gdb_history
+*.log

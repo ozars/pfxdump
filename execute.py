@@ -216,7 +216,7 @@ def experiment(
             output_path,
             sample_prefixes_path,
             spans
-        ])))
+        ]))
 
     pnf = re.compile(r"^([^\d]+)(\d+\.\d+)$")
     with open(sample_prefixes_path) as f:

@@ -206,7 +206,7 @@ def experiment(
         zidx_path = gzip_path
     os.makedirs(output_path, exist_ok=True)
     with open(output_path / f"{experiment_name}.metadata", "w") as metadata:
-        metadata.writelines(map(str, [
+        metadata.write("\n".join([
             datetime.datetime.now(),
             date_range,
             collectors,
@@ -216,7 +216,7 @@ def experiment(
             output_path,
             sample_prefixes_path,
             spans
-        ]))
+        ])))
 
     pnf = re.compile(r"^([^\d]+)(\d+\.\d+)$")
     with open(sample_prefixes_path) as f:

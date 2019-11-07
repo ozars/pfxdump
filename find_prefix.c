@@ -125,7 +125,7 @@ void prefix_printf(struct afi_prefix_t afi_prefix) {
     memset(afi_prefix.prefix.addr + bytes + (bits > 0), 0,
            16 - bytes - (bits > 0));
     if (bits) {
-        uint8_t msb = 0xFFU << bits;
+        uint8_t msb = 0xFFU << (8 - bits);
         afi_prefix.prefix.addr[bytes] &= msb;
     }
     switch (afi_prefix.type) {

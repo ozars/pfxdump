@@ -10,6 +10,7 @@ import subprocess
 
 import pandas as pd
 import matplotlib.pyplot as plt
+import netifaces
 
 from dateutil.parser import parse as parse_date
 from pathlib import Path
@@ -130,6 +131,28 @@ def _timed_run(cmd_args):
                 ["bash", "-c", "export TIMEFORMAT=%R; time " + cmd],
                 capture_output=True)
 
+def _measure_network_data(cmd_args):
+    cmd = " ".join(_escape_bash_arg(arg) for arg in cmd_args)
+    logger.debug(f"Timed run: {cmd}")
+    return subprocess.run(
+                ["sudo""bash", "-c", "export TIMEFORMAT=%R; time " + cmd],
+                capture_output=True)
+
+def _timed_network_run(cmd_args):
+    cmd = " ".join(_escape_bash_arg(arg) for arg in cmd_args)
+    logger.debug(f"Timed network run: {cmd}")
+    dev = netifaces.gateways()['default'][netifaces.AF_INET][1]
+    return subprocess.run(
+                ["sudo", "nsntrace", "-d", dev, "bash", "-c",
+                    "export TIMEFORMAT=%R; time " + cmd],
+                capture_output=True)
+
+def _parse_pcap():
+    proc = subprocess.run(
+            ["tshark", "-r", "nsntrace.pcap", "-T", "fields", "-e", "tcp.len"],
+            capture_output=True)
+    return str(sum(int(line) for line in proc.stdout.split(b'\n') if len(line)))
+
 def _read_sampled_prefixes(f):
     if not hasattr(f, read):
         f = open(str(f))
@@ -162,11 +185,10 @@ def copy(date_range, collectors, from_path, to_path):
 def run_zidx(*args):
     return _timed_run([str(zidx_bin), *args])
 
-def run_pfxdump(*args):
+def run_pfxdump(remote, *args):
+    if remote:
+        return _timed_network_run([str(pfxdump_bin), *args])
     return _timed_run([str(pfxdump_bin), *args])
-
-def run_pfxdump_remote(*args):
-    return
 
 def zidx(date_range, collectors, from_path, to_path, spans, softlink_span):
     if to_path is None:
@@ -226,6 +248,7 @@ def experiment(
         ])))
 
     pnf = re.compile(r"^([^\d]+)(\d+\.\d+)$")
+    is_remote = type(gzip_path) is URL
     with open(sample_prefixes_path) as f:
         prefixes = [line.rstrip() for line in f]
     with open(output_path / f"{experiment_name}.csv", "w") as f:
@@ -236,7 +259,7 @@ def experiment(
                 date_range, collectors, gzip_path, zidx_path):
             for p in prefixes:
                 if without_zx:
-                    time = run_pfxdump(str(gzip_file), "-", p, "-i")\
+                    time = run_pfxdump(is_remote, str(gzip_file), "-", p, "-i")\
                                     .stderr.rstrip().decode('ascii')
                     m = pnf.match(time)
                     if m:
@@ -244,12 +267,12 @@ def experiment(
                         time = m.group(2)
                     else:
                         status = ""
-                    f.write(",".join(["0", "0", "none", p, time, "0", str(gzip_file), status]) + "\n")
+                    f.write(",".join(["0", "0", "none", p, time, _parse_pcap() if is_remote else "0", str(gzip_file), status]) + "\n")
                     logger.debug(f"Done: {p} on {gzip_file} without span.")
                 for span in spans:
                     for comp_state in ["comp", "uncomp"]:
                         zx = zidx_file + f"_{span}_{comp_state}.zx"
-                        time = run_pfxdump(str(gzip_file), str(zx), p)\
+                        time = run_pfxdump(is_remote, str(gzip_file), str(zx), p)\
                                         .stderr.rstrip().decode('ascii')
                         m = pnf.match(time)
                         if m:
@@ -257,7 +280,7 @@ def experiment(
                             time = m.group(2)
                         else:
                             status = ""
-                        f.write(",".join(["1", span, comp_state, p, time, "0", str(gzip_file), status]) + "\n")
+                        f.write(",".join(["1", span, comp_state, p, time, _parse_pcap() if is_remote else "0", str(gzip_file), status]) + "\n")
                         logger.debug(f"Done: {p} on {gzip_file} with span {span} {comp_state}.")
 
 def experiment_plot(

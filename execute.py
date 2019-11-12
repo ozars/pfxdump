@@ -13,6 +13,7 @@ import matplotlib.pyplot as plt
 
 from dateutil.parser import parse as parse_date
 from pathlib import Path
+from urlpath import URL
 
 logger = logging.getLogger(__name__)
 cwd = Path(__file__).parent
@@ -26,6 +27,8 @@ experiment_dir = cwd / "experiment"
 sample_prefixes_path = data_dir / "sample_prefixes"
 
 Path.__add__ = lambda self, val: Path(str(self) + val)
+URL.__org_truediv__ = URL.__truediv__
+URL.__truediv__ = lambda self, obj: self / str(obj) if type(obj) is Path else self.__org_truediv__(obj)
 
 def _date_mod(time, delta, epoch=None):
     if epoch is None:
@@ -95,8 +98,9 @@ def _mrt_path_range(date_range, collectors, base_path, is_output=False):
             if is_output:
                 logger.info(f"Creating directory '{path}' if not exists...")
                 path.mkdir(parents=True, exist_ok=True)
-            assert path.exists()
-            assert path.is_dir()
+            if type(path) is not URL:
+                assert path.exists()
+                assert path.is_dir()
 
             path /= p
             if is_output and not p.exists():
@@ -145,8 +149,8 @@ def NoneOr(this_type):
     return get_type
 
 def PathOrUrl(s):
-    if type(s) is str and (s.beginswith('http://') or s.beginswith('https://')):
-        return s
+    if type(s) is str and (s.startswith('http://') or s.startswith('https://')):
+        return URL(s)
     return Path(s)
 
 def copy(date_range, collectors, from_path, to_path):
@@ -160,6 +164,9 @@ def run_zidx(*args):
 
 def run_pfxdump(*args):
     return _timed_run([str(pfxdump_bin), *args])
+
+def run_pfxdump_remote(*args):
+    return
 
 def zidx(date_range, collectors, from_path, to_path, spans, softlink_span):
     if to_path is None:
@@ -206,7 +213,7 @@ def experiment(
         zidx_path = gzip_path
     os.makedirs(output_path, exist_ok=True)
     with open(output_path / f"{experiment_name}.metadata", "w") as metadata:
-        metadata.write("\n".join([
+        metadata.write("\n".join(map(str, [
             datetime.datetime.now(),
             date_range,
             collectors,
@@ -216,7 +223,7 @@ def experiment(
             output_path,
             sample_prefixes_path,
             spans
-        ]))
+        ])))
 
     pnf = re.compile(r"^([^\d]+)(\d+\.\d+)$")
     with open(sample_prefixes_path) as f:
@@ -253,11 +260,17 @@ def experiment(
                         f.write(",".join(["1", span, comp_state, p, time, "0", str(gzip_file), status]) + "\n")
                         logger.debug(f"Done: {p} on {gzip_file} with span {span} {comp_state}.")
 
-def experiment_plot(experiment_name, experiment_path, output_path, without_zx, show):
+def experiment_plot(
+        experiment_name, experiment_path, output_path,
+        output_suffix, without_zx, show):
     if without_zx:
         agg = ['with_zx', 'span']
+        if output_suffix is None:
+            output_suffix = "_without_zx"
     else:
         agg = ['span']
+        if output_suffix is None:
+            output_suffix = ""
     df = pd.read_csv(experiment_path / (experiment_name + ".csv"))
     df.prefix = pd.Categorical(df.prefix, ordered=True, categories=df.prefix.unique())
 
@@ -274,7 +287,7 @@ def experiment_plot(experiment_name, experiment_path, output_path, without_zx, s
     plt.xlabel("Prefix")
     plt.ylabel("Time (sec)")
     if output_path:
-        plt.savefig(str(output_path / (experiment_name + ".png")))
+        plt.savefig(str(output_path / (experiment_name + output_suffix + ".png")))
     if show:
         plt.show()
 
@@ -320,6 +333,7 @@ def main(args=None):
                     "softlink_span"]))
 
     subparser = subparsers.add_parser("sample_prefixes")
+    from urlpath import URL
     subparser.add_argument(
             "gzip_path", nargs="?", default=data_dir, type=PathOrUrl)
     subparser.add_argument(
@@ -359,11 +373,13 @@ def main(args=None):
     subparser.add_argument("experiment_name")
     subparser.add_argument("--experiment-path", default=experiment_dir, type=Path)
     subparser.add_argument("--output-path", default=experiment_dir, type=Path)
+    subparser.add_argument("--output-suffix")
     subparser.add_argument("--without-zx", action="store_true")
     subparser.add_argument("--show", action="store_true")
     subparser.set_defaults(
             func=_args_callback(experiment_plot,
-                ["experiment_name", "experiment_path", "output_path", "without_zx", "show"]))
+                ["experiment_name", "experiment_path", "output_path",
+                    "output_suffix", "without_zx", "show"]))
 
     args = parser.parse_args(args)
 

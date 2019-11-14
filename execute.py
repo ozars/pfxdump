@@ -286,18 +286,26 @@ def experiment(
 def experiment_plot(
         experiment_name, experiment_path, output_path,
         output_suffix, without_zx, show):
+    df = pd.read_csv(experiment_path / (experiment_name + ".csv"))
+    df.prefix = pd.Categorical(df.prefix, ordered=True, categories=df.prefix.unique())
+
     if without_zx:
-        agg = ['with_zx', 'span']
+        if len(df[df.with_zx == 1]['span'].unique()) == 1:
+            agg = ['with_zx']
+        else:
+            agg = ['with_zx', 'span']
         if output_suffix is None:
             output_suffix = "_without_zx"
     else:
         agg = ['span']
         if output_suffix is None:
             output_suffix = ""
-    df = pd.read_csv(experiment_path / (experiment_name + ".csv"))
-    df.prefix = pd.Categorical(df.prefix, ordered=True, categories=df.prefix.unique())
 
+    erroneous = df[~df['time'].str.match('^\d+.\d+$')]
+    logger.warning('Ignoring %d line(s) including "time" values %s', len(erroneous), erroneous['time'].unique())
+    df.drop(erroneous.index, inplace=True)
     df = df.astype({'time': 'double'})
+
     rng = list(range(0, len(df.prefix.unique()) + 1, len(df.prefix.unique()) // 20))
     if without_zx:
         df = df[df.comp_state != "uncomp"]

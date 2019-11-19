@@ -287,7 +287,7 @@ def experiment(
 
 def experiment_plot(
         experiment_name, experiment_path, output_path,
-        output_suffix, without_zx, show):
+        output_suffix, without_zx, show, y_is_data=False):
     df = pd.read_csv(experiment_path / (experiment_name + ".csv"))
     df.prefix = pd.Categorical(df.prefix, ordered=True, categories=df.prefix.unique())
 
@@ -303,22 +303,36 @@ def experiment_plot(
         if output_suffix is None:
             output_suffix = ""
 
-    erroneous = df[~df['time'].str.match('^\d+.\d+$')]
-    logger.warning('Ignoring %d line(s) including "time" values %s', len(erroneous), erroneous['time'].unique())
-    df.drop(erroneous.index, inplace=True)
-    df = df.astype({'time': 'double'})
+    if not y_is_data:
+        ylabel = "Time (sec)"
+        pivot = "time"
+    else:
+        ylabel = "Size (MB)"
+        pivot = "data"
+
+    if df[pivot].dtype in [str, object]:
+        erroneous = df[~df[pivot].str.match('^\d+.\d+$')]
+        logger.warning('Ignoring %d line(s) including "%s" values %s', len(erroneous), pivot, erroneous[pivot].unique())
+        df.drop(erroneous.index, inplace=True)
+        df = df.astype({pivot: 'double'})
+
+    if y_is_data:
+        df[pivot] /= 1024*1024
+
+    df = df[~df.mrt_file.str.contains('rrc21') & ~df.mrt_file.str.contains('rrc20')]
 
     rng = list(range(0, len(df.prefix.unique()) + 1, len(df.prefix.unique()) // 20))
     if without_zx:
         df = df[df.comp_state != "uncomp"]
     else:
         df = df[df.comp_state == "comp"]
-    df = df.groupby(agg + ['prefix'])['time'].agg('mean').groupby(agg)
+    df = df.groupby(agg + ['prefix'])[pivot].agg('mean').groupby(agg)
+    logger.info(df.head())
     logger.info(df.describe())
-    df.plot(x='prefix', y='time', legend=True)
+    df.plot(x='prefix', y=pivot, legend=True)
     plt.xticks(rng, rng)
     plt.xlabel("Prefix")
-    plt.ylabel("Time (sec)")
+    plt.ylabel(ylabel)
     if output_path:
         plt.savefig(str(output_path / (experiment_name + output_suffix + ".png")))
     if show:
@@ -387,7 +401,7 @@ def main(args=None):
     subparser.add_argument(
             "zidx_path", nargs="?", default=data_dir, type=Path)
     subparser.add_argument(
-            "sample_prefixes_path", nargs="?", default=sample_prefixes_path,
+            "--sample-prefixes-path", nargs="?", default=sample_prefixes_path,
             type=Path)
     subparser.add_argument("--output-path", default=experiment_dir)
     subparser.add_argument(
@@ -409,11 +423,23 @@ def main(args=None):
     subparser.add_argument("--output-suffix")
     subparser.add_argument("--without-zx", action="store_true")
     subparser.add_argument("--show", action="store_true")
+    subparser.add_argument("--y-is-data", action="store_true")
+    subparser.set_defaults(
+            func=_args_callback(experiment_plot,
+                ["experiment_name", "experiment_path", "output_path",
+                    "output_suffix", "without_zx", "show", "y_is_data"]))
+
+    subparser = subparsers.add_parser("zidx_plot")
+    subparser.add_argument("experiment_name")
+    subparser.add_argument("--experiment-path", default=experiment_dir, type=Path)
+    subparser.add_argument("--output-path", default=experiment_dir, type=Path)
+    subparser.add_argument("--output-suffix")
+    subparser.add_argument("--without-zx", action="store_true")
+    subparser.add_argument("--show", action="store_true")
     subparser.set_defaults(
             func=_args_callback(experiment_plot,
                 ["experiment_name", "experiment_path", "output_path",
                     "output_suffix", "without_zx", "show"]))
-
     args = parser.parse_args(args)
 
     if args.verbose:

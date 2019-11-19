@@ -257,6 +257,8 @@ def experiment(
                 "mrt_file", "status"]) + "\n")
         for gzip_file, zidx_file in _mrt_path_pairs_range(
                 date_range, collectors, gzip_path, zidx_path):
+            if type(gzip_file) is Path:
+                subprocess.run(f"touch '{gzip_file}'", shell=True)
             for p in prefixes:
                 if without_zx:
                     time = run_pfxdump(is_remote, str(gzip_file), "-", p, "-i")\

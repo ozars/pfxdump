@@ -16,6 +16,19 @@
 //
 #include "find_prefix.h"
 
+#include <sys/time.h>
+#if 0
+#define TIMER_DECL struct timeval tv1, tv2
+#define TIMER_MS(tv) (tv.tv_sec + tv.tv_usec / 1000000.0)
+#define TIMER_START gettimeofday(&tv1, NULL)
+#define TIMER_LAPSE do { gettimeofday(&tv2, NULL); printf("lapsed from line %d: %.03f\n", __LINE__, TIMER_MS(tv2) - TIMER_MS(tv1)); fflush(stdout); tv1.tv_sec = tv2.tv_sec; tv1.tv_usec = tv2.tv_usec; } while(0)
+#else
+#define TIMER_DECL
+#define TIMER_MS(tv)
+#define TIMER_START
+#define TIMER_LAPSE
+#endif
+
 char startswith(const char *string, const char *prefix) {
     while (*prefix)
         if (*prefix++ != *string++) return 0;
@@ -125,8 +138,6 @@ int main(int argc, char **argv) {
         pfx_chkp = find_prefix_checkpoint(&pfx, index);
         if (pfx_chkp.index < -1) errfail("error: couldn't find checkpoint");
     }
-
-
 
     zidx_checkpoint *chkp = NULL;
     if (pfx_chkp.index >= 0) chkp = zidx_get_checkpoint(index, pfx_chkp.index);

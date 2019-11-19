@@ -42,6 +42,11 @@ void create_index(const char *gzfile, const char *indexfile, long int span, int 
 
     ret = sl_fclose(indexf);
     assert(ret == ZX_RET_OK);
+
+    ret = zidx_index_destroy(zidx);
+    assert(ret == ZX_RET_OK);
+
+    free(zidx);
 }
 
 #ifndef NDEBUG
@@ -95,6 +100,11 @@ void verify_index(const char *gzfile, const char *indexfile)
 
     ret = sl_fclose(indexf);
     assert(ret == ZX_RET_OK);
+
+    ret = zidx_index_destroy(zidx);
+    assert(ret == ZX_RET_OK);
+
+    free(zidx);
 }
 #endif
 

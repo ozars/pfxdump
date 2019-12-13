@@ -51,7 +51,7 @@ if plot_type == 'csv':
             if k[0] == 0:
                 return 'Without ZIDX'
             assert k[0] == 1
-            return f'With ZIDX (span = {k[1]}KB)'
+            return f'With ZIDX (span: {pretty_size(k[1])})'
 
         if clear:
             plt.clf()
@@ -64,11 +64,14 @@ if plot_type == 'csv':
                 next(colors)
                 continue
             plt.plot(v.values, label=label(k), color=next(colors))
-        plt.legend(fontsize='x-small')
+        plt.legend()
         sz = df.size().unique()[0]
         rng = range(0, sz + 1, sz // 20)
         plt.xticks(rng)
+        bottom, top = plt.ylim()
         plt.xlim(rng[0], rng[-1])
+        plt.ylim(bottom, top * 1.05)
+        plt.tight_layout()
         plt.savefig(fname + ".png")
 
     time_graph(dfg['time'], "Time (sec)", zoom_in=False, fname=output_name + "_time")

@@ -6,13 +6,14 @@ import matplotlib.pyplot as plt
 df = pd.read_csv("results.csv")
 df.at[df.chunks == 0, 'chunks'] = 1
 df = df.groupby("chunks").mean().reset_index()
+df['size'] /= 1024 * 1024
 
-print(df)
+print(df.to_string())
 
 plt.plot(df['chunks'], df['time'], "o")
 plt.grid(linestyle=':', zorder=0)
-plt.ylabel("Time")
-plt.xlabel("Threads")
+plt.ylabel("Time (s)")
+plt.xlabel("Number of threads")
 plt.tight_layout()
-plt.show()
 plt.savefig("multithread.png")
+plt.show()

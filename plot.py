@@ -72,7 +72,7 @@ if plot_type == 'csv':
         plt.xlim(rng[0], rng[-1])
         plt.ylim(bottom, top * 1.05)
         plt.tight_layout()
-        plt.savefig(fname + ".png")
+        plt.savefig(fname + ".eps")
 
     time_graph(dfg['time'], "Time (sec)", zoom_in=False, fname=output_name + "_time")
     if len(dfg) > 2:
@@ -124,7 +124,7 @@ elif plot_type == 'zx':
         ax.set_xlabel("Spans")
         ax.set_xticks(rng)
         ax.set_xticklabels(dfg.groups.keys())
-        fig.savefig(fname + ".png")
+        fig.savefig(fname + ".eps")
 
     def zx_single_bar(dfgs, labels, ylabel, fname, clear=True):
         if clear:
@@ -155,7 +155,7 @@ elif plot_type == 'zx':
         bottom, top = ax.get_ylim()
         ax.set_ylim(bottom, top * 1.05)
         fig.tight_layout()
-        fig.savefig(fname + ".png")
+        fig.savefig(fname + ".eps")
 
     #  zx_bar(dfg['ratio'], "ZIDX File Size Ratio (%)", output_name + "_zx_ratio", "C0")
     #  zx_bar(dfg['comp_ratio'], "Compressed ZIDX File Size Ratio (%)", output_name + "_zx_comp_ratio", "C1")

@@ -6,6 +6,8 @@ import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 
+plt.rcParams["font.size"] = 12
+
 from pathlib import Path
 
 Path.__add__ = lambda self, val: Path(str(self) + val)
@@ -148,8 +150,8 @@ elif plot_type == 'zx':
             assert len(dfg) == len(dfgs[0])
         ax.grid(linestyle=':', zorder=0)
         ax.legend()
-        ax.set_ylabel(ylabel)
-        ax.set_xlabel("Spans")
+        ax.set_ylabel(ylabel, fontsize=12)
+        ax.set_xlabel("Spans", fontsize=12)
         ax.set_xticks(rng)
         ax.set_xticklabels([pretty_size(size) for size in dfgs[0].groups.keys()])
         bottom, top = ax.get_ylim()
@@ -157,6 +159,7 @@ elif plot_type == 'zx':
         fig.tight_layout()
         fig.savefig(fname + ".eps")
 
+    plt.rcParams["font.size"] = 10
     #  zx_bar(dfg['ratio'], "ZIDX File Size Ratio (%)", output_name + "_zx_ratio", "C0")
     #  zx_bar(dfg['comp_ratio'], "Compressed ZIDX File Size Ratio (%)", output_name + "_zx_comp_ratio", "C1")
     zx_single_bar([dfg['ratio'], dfg['comp_ratio']], ["Not compressed", "Compressed"], "ZIDX File Size Ratio (%)", output_name + "_zx_single")

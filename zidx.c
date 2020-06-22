@@ -18,7 +18,7 @@ void create_index(const char *gzfile, const char *indexfile, long int span, int 
     assert(gzf);
 
     indexf = sl_fopen(indexfile, "wb");
-    assert(gzf);
+    assert(indexf);
 
     zidx = zidx_index_create();
     assert(zidx);
@@ -66,7 +66,7 @@ void verify_index(const char *gzfile, const char *indexfile)
     assert(gzf);
 
     indexf = sl_fopen(indexfile, "rb");
-    assert(gzf);
+    assert(indexf);
 
     zidx = zidx_index_create();
     assert(zidx);
@@ -95,6 +95,13 @@ void verify_index(const char *gzfile, const char *indexfile)
         assert(!memcmp(buf1, buf2, read1));
     } while (read1 == len);
 
+    int list_len=zidx_get_checkpoint_list_len(zidx);
+    int x;
+    for(x=0;x<list_len;x++)
+    {
+	    printf("Checksum of checkpoint %d = %lu\n",x,(unsigned long) zidx_get_checkpoint_checksum(zidx,x));
+    }
+
     ret = sl_fclose(gzf);
     assert(ret == ZX_RET_OK);
 
@@ -116,8 +123,8 @@ int main(int argc, char *argv[])
     }
     long int span = atol(argv[3]);
     int is_uncompressed = atoi(argv[4]);
-    create_index(argv[1], argv[2], span, is_uncompressed);
 #ifndef NDEBUG
+    create_index(argv[1], argv[2], span, is_uncompressed);
     verify_index(argv[1], argv[2]);
 #endif
     return 0;

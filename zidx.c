@@ -6,6 +6,39 @@
 #include <zidx.h>
 #include <zlib.h>
 
+
+uint32_t get_gzip_checksum(const char *filename)
+{
+
+	FILE *comp;
+
+	comp=fopen(filename,"rb");
+	if(comp==NULL)
+	{
+		printf("Error opening file (%s)\n",filename);
+		return -1;
+	}
+	fseek(comp,0,SEEK_END);
+	long comp_size=ftell(comp);
+	fseek(comp,0,SEEK_SET);
+
+	unsigned char *contents=malloc(comp_size+1);
+	fread(contents,1,comp_size,comp);
+	fclose(comp);
+
+	long start_checksum=comp_size-8;
+	long end_checksum=comp_size-4;
+	uint32_t file_checksum=0;
+
+	//little-endian conversion
+	int x;
+	for(x=end_checksum-1;x>=start_checksum;x--)
+	{
+		file_checksum=(file_checksum<<8)+contents[x];
+	}
+	return file_checksum;
+}
+
 void create_index(const char *gzfile, const char *indexfile, long int span, int is_uncompressed)
 {
     streamlike_t *gzf    = NULL;
@@ -101,6 +134,11 @@ void verify_index(const char *gzfile, const char *indexfile)
     {
 	    printf("Checksum of checkpoint %d = %lu\n",x,(unsigned long) zidx_get_checkpoint_checksum(zidx,x));
     }
+
+    uint32_t zidx_checksum = zidx_get_index_running_checksum(zidx);
+    uint32_t gzip_checksum = get_gzip_checksum(gzfile);
+    assert(gzip_checksum==zidx_checksum);
+
 
     ret = sl_fclose(gzf);
     assert(ret == ZX_RET_OK);
